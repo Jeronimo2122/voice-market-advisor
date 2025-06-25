@@ -1,7 +1,6 @@
 
-import { useState } from "react";
-import { Star, ShoppingCart, Heart, Mic } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Product } from "../types/product";
 
@@ -11,83 +10,55 @@ interface ProductCardProps {
 }
 
 const ProductCard = ({ product, index }: ProductCardProps) => {
-  const [isLiked, setIsLiked] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+  const navigate = useNavigate();
 
-  const handleAskAI = () => {
-    console.log(`Asking AI about product: ${product.name}`);
-    // This will be connected to Gemini Live later
+  const handleCardClick = () => {
+    navigate(`/product/${product.id}`);
   };
 
   return (
     <div 
-      className={`group bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-slate-700 hover:border-blue-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/10 animate-fade-in`}
+      className={`bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-slate-700 hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10 cursor-pointer animate-fade-in`}
       style={{ animationDelay: `${index * 100}ms` }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onClick={handleCardClick}
     >
-      <div className="relative overflow-hidden rounded-lg mb-4">
+      <div className="relative overflow-hidden rounded-lg mb-3">
         <img 
           src={product.image} 
           alt={product.name}
-          className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
+          className="w-full h-48 object-cover transition-transform duration-300 hover:scale-105"
         />
         
-        {/* Overlay buttons */}
-        <div className={`absolute inset-0 bg-black/40 flex items-center justify-center space-x-2 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-          <Button
-            size="icon"
-            variant="secondary"
-            className="bg-white/20 backdrop-blur-sm hover:bg-white/30"
-            onClick={handleAskAI}
-          >
-            <Mic className="h-4 w-4 text-white" />
-          </Button>
-          <Button
-            size="icon"
-            variant="secondary"
-            className="bg-white/20 backdrop-blur-sm hover:bg-white/30"
-            onClick={() => setIsLiked(!isLiked)}
-          >
-            <Heart className={`h-4 w-4 ${isLiked ? 'text-red-500 fill-current' : 'text-white'}`} />
-          </Button>
-        </div>
-
         {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-col space-y-1">
           {product.badge && (
-            <Badge variant="secondary" className="bg-blue-600 text-white">
+            <Badge variant="secondary" className="bg-blue-600 text-white text-xs">
               {product.badge}
             </Badge>
           )}
           {product.discount && (
-            <Badge variant="destructive" className="bg-red-600 text-white">
+            <Badge variant="destructive" className="bg-red-600 text-white text-xs">
               -{product.discount}%
             </Badge>
           )}
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div>
-          <h3 className="font-semibold text-white group-hover:text-blue-400 transition-colors">
-            {product.name}
-          </h3>
-          <p className="text-sm text-slate-400 line-clamp-2">
-            {product.description}
-          </p>
-        </div>
+      <div className="space-y-2">
+        <h3 className="font-semibold text-white text-sm line-clamp-2 leading-tight">
+          {product.name}
+        </h3>
 
         <div className="flex items-center space-x-2">
           <div className="flex items-center">
             {[...Array(5)].map((_, i) => (
               <Star
                 key={i}
-                className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'text-yellow-400 fill-current' : 'text-slate-600'}`}
+                className={`h-3 w-3 ${i < Math.floor(product.rating) ? 'text-yellow-400 fill-current' : 'text-slate-600'}`}
               />
             ))}
           </div>
-          <span className="text-sm text-slate-400">({product.reviews})</span>
+          <span className="text-xs text-slate-400">({product.reviews})</span>
         </div>
 
         <div className="flex items-center justify-between">
@@ -99,13 +70,6 @@ const ProductCard = ({ product, index }: ProductCardProps) => {
               </span>
             )}
           </div>
-          <Button 
-            size="sm" 
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <ShoppingCart className="h-4 w-4 mr-1" />
-            Add
-          </Button>
         </div>
       </div>
     </div>

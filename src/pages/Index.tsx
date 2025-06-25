@@ -2,7 +2,6 @@
 import { useState } from "react";
 import Header from "../components/Header";
 import ProductGrid from "../components/ProductGrid";
-import VoiceAssistant from "../components/VoiceAssistant";
 import { sampleProducts } from "../data/products";
 
 const Index = () => {
@@ -25,20 +24,18 @@ const Index = () => {
         setSelectedCategory={setSelectedCategory}
       />
       
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4 animate-fade-in">
-            Discover the Future
+      <main className="px-4 py-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-white mb-2">
+            VoiceShop
           </h1>
-          <p className="text-xl text-slate-300 animate-fade-in">
-            Explore cutting-edge products with your AI shopping assistant
+          <p className="text-lg text-slate-300">
+            Shop with your voice assistant
           </p>
         </div>
 
         <ProductGrid products={filteredProducts} />
       </main>
-
-      <VoiceAssistant />
     </div>
   );
 };
