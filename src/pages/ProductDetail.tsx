@@ -2,13 +2,22 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { sampleProducts } from "../data/products";
+import { useProducts } from "../hooks/useProducts";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { data: products = [], isLoading } = useProducts();
   
-  const product = sampleProducts.find(p => p.id === id);
+  const product = products.find(p => p.id === id);
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading product...</div>
+      </div>
+    );
+  }
   
   if (!product) {
     return (
