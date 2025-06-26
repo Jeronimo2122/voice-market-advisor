@@ -1,6 +1,12 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+// @ts-expect-error - Deno imports not recognized in local TypeScript environment
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

@@ -1,7 +1,12 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+// @ts-expect-error - Deno imports not recognized in local TypeScript environment
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.2';
+
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,7 +16,7 @@ const corsHeaders = {
 interface ChatRequest {
   message: string;
   conversationHistory?: Array<{ role: string; content: string }>;
-  productContext?: any[];
+  productContext?: unknown[];
 }
 
 const handler = async (req: Request): Promise<Response> => {

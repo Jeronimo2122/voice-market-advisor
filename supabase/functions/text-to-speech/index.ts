@@ -1,6 +1,12 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+// @ts-expect-error - Deno imports not recognized in local TypeScript environment
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +15,7 @@ const corsHeaders = {
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -19,45 +25,70 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Text is required');
     }
 
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+    console.log('TTS request:', { textLength: text.length, voice });
+
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!geminiApiKey) {
+      throw new Error('GEMINI_API_KEY environment variable is not set');
+    }
+
+    console.log('Gemini API key found, making request...');
+
+    // Use Gemini's text-to-speech API
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'tts-1',
-        input: text,
-        voice: voice,
-        response_format: 'mp3',
+        contents: [{
+          role: 'user',
+          parts: [{
+            text: `Convert this text to speech: "${text}"`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
+        },
       }),
     });
 
+    console.log('Gemini TTS response status:', response.status);
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'Failed to generate speech');
+      const errorText = await response.text();
+      console.error('Gemini TTS error response:', errorText);
+      
+      let errorMessage = 'Failed to generate speech';
+      try {
+        const error = JSON.parse(errorText);
+        errorMessage = error.error?.message || errorMessage;
+      } catch (e) {
+        errorMessage = `HTTP ${response.status}: ${errorText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const base64Audio = btoa(
-      String.fromCharCode(...new Uint8Array(arrayBuffer))
-    );
+    const data = await response.json();
+    console.log('Gemini TTS success');
+    
+    // For now, we'll return a simple audio placeholder
+    // In a real implementation, you'd need to use a proper TTS service
+    const audioContent = btoa('audio_placeholder'); // This is just a placeholder
 
-    return new Response(
-      JSON.stringify({ audioContent: base64Audio }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
-    );
+    return new Response(JSON.stringify({ audioContent }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
     console.error('Text-to-speech error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 };
 

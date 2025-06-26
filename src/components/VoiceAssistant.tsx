@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { Mic, MicOff, MessageCircle, Volume2, VolumeX, Trash2 } from "lucide-react";
+import { Mic, MicOff, MessageCircle, Volume2, VolumeX, Trash2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,7 +16,8 @@ const VoiceAssistant = () => {
     startListening,
     stopListening,
     stopSpeaking,
-    clearConversation
+    clearConversation,
+    testSpeech
   } = useVoiceAssistant();
 
   const handleVoiceToggle = () => {
@@ -26,6 +26,10 @@ const VoiceAssistant = () => {
     } else {
       startListening();
     }
+  };
+
+  const handleTestSpeech = () => {
+    testSpeech("Hello! This is a test of the speech generation system.");
   };
 
   const getStatusText = () => {
@@ -87,6 +91,16 @@ const VoiceAssistant = () => {
                       <VolumeX className="h-4 w-4" />
                     </Button>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleTestSpeech}
+                    disabled={isSpeaking || isProcessing}
+                    className="text-slate-400 hover:text-white h-8 w-8 p-0"
+                    title="Test speech generation"
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
                   {messages.length > 0 && (
                     <Button
                       variant="ghost"

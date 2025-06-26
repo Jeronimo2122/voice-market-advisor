@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useProducts } from './useProducts';
@@ -143,51 +142,67 @@ export const useVoiceAssistant = () => {
   const speakText = async (text: string) => {
     try {
       setIsSpeaking(true);
+      console.log('Starting text-to-speech for:', text.substring(0, 50) + '...');
       
-      const { data: ttsData, error: ttsError } = await supabase.functions.invoke('text-to-speech', {
-        body: { text, voice: 'alloy' }
-      });
-
-      if (ttsError) {
-        throw new Error(ttsError.message);
+      // Check if browser supports speech synthesis
+      if (!window.speechSynthesis) {
+        throw new Error('Speech synthesis not supported in this browser');
       }
 
-      // Play the audio
-      const audioData = `data:audio/mp3;base64,${ttsData.audioContent}`;
-      const audio = new Audio(audioData);
-      currentAudioRef.current = audio;
+      // Create a new speech utterance
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
 
-      audio.onended = () => {
-        setIsSpeaking(false);
-        currentAudioRef.current = null;
+      // Set up event handlers
+      utterance.onstart = () => {
+        console.log('Speech started');
       };
 
-      audio.onerror = () => {
+      utterance.onend = () => {
+        console.log('Speech ended');
         setIsSpeaking(false);
-        currentAudioRef.current = null;
-        setError('Failed to play audio response');
       };
 
-      await audio.play();
+      utterance.onerror = (event) => {
+        console.error('Speech error:', event);
+        setIsSpeaking(false);
+        setError(`Speech error: ${event.error}`);
+      };
+
+      // Speak the text
+      console.log('Starting speech synthesis...');
+      window.speechSynthesis.speak(utterance);
+      
     } catch (err) {
       console.error('Error with text-to-speech:', err);
+      console.error('Error details:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      });
       setIsSpeaking(false);
-      setError('Failed to generate speech. Please try again.');
+      setError(`Failed to generate speech: ${err.message}`);
     }
   };
 
   const stopSpeaking = useCallback(() => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current.currentTime = 0;
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
       setIsSpeaking(false);
-      currentAudioRef.current = null;
     }
   }, []);
 
   const clearConversation = useCallback(() => {
     setMessages([]);
     setError(null);
+  }, []);
+
+  const testSpeech = useCallback(async (testText: string) => {
+    console.log('Testing speech generation with:', testText);
+    await speakText(testText);
   }, []);
 
   return {
@@ -199,6 +214,7 @@ export const useVoiceAssistant = () => {
     startListening,
     stopListening,
     stopSpeaking,
-    clearConversation
+    clearConversation,
+    testSpeech
   };
 };
