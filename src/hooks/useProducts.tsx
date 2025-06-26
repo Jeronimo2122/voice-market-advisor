@@ -1,8 +1,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { Product } from '@/types/product';
 
-export interface Product {
+export interface DatabaseProduct {
   id: string;
   name: string;
   description: string;
@@ -38,6 +39,7 @@ export const useProducts = () => {
         price: Number(product.price),
         originalPrice: product.original_price ? Number(product.original_price) : undefined,
         image: product.image_url,
+        inStock: product.in_stock,
       })) as Product[];
     },
   });
