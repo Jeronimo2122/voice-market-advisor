@@ -41,6 +41,30 @@ export type Database = {
           },
         ]
       }
+      documents: {
+        Row: {
+          id: string
+          content: string
+          metadata: Json | null
+          embedding: number[] | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          content: string
+          metadata?: Json | null
+          embedding?: number[] | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          content?: string
+          metadata?: Json | null
+          embedding?: number[] | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           badge: string | null
@@ -121,7 +145,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      match_documents: {
+        Args: {
+          query_embedding: number[]
+          match_threshold?: number
+          match_count?: number
+        }
+        Returns: {
+          id: string
+          content: string
+          metadata: Json
+          similarity: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

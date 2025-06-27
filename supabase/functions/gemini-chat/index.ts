@@ -19,6 +19,89 @@ interface ChatRequest {
   productContext?: unknown[];
 }
 
+/**
+ * Get product context either via RAG or by loading all documents
+ */
+async function getProductContext(query: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const useRag = Deno.env.get('USE_RAG') === 'true';
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.warn('Missing Supabase config');
+      return '';
+    }
+
+    if (useRag && openaiApiKey) {
+      // RAG: generate embedding
+      const embeddingRes = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: query,
+          model: 'text-embedding-ada-002',
+        }),
+      });
+
+      if (!embeddingRes.ok) {
+        console.error('Embedding error:', await embeddingRes.text());
+        return '';
+      }
+
+      const embedding = (await embeddingRes.json()).data[0].embedding;
+
+      // Call match_documents RPC
+      const matchRes = await fetch(`${supabaseUrl}/rest/v1/rpc/match_documents`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'apikey': supabaseServiceKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query_embedding: embedding,
+          match_threshold: 0.78,
+          match_count: 5,
+        }),
+      });
+
+      if (!matchRes.ok) {
+        console.error('match_documents failed:', await matchRes.text());
+        return '';
+      }
+
+      const docs = await matchRes.json();
+      return docs.map((d: { content: string }) => d.content).join('\n\n');
+    }
+
+    // Fallback: get all documents
+    const allDocsRes = await fetch(`${supabaseUrl}/rest/v1/documents?select=content`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'apikey': supabaseServiceKey,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!allDocsRes.ok) {
+      console.error('Fetch all documents failed:', await allDocsRes.text());
+      return '';
+    }
+
+    const docs = await allDocsRes.json();
+    return docs.map((d: { content: string }) => d.content).join('\n\n');
+  } catch (err) {
+    console.error('getProductContext error:', err);
+    return '';
+  }
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -28,36 +111,26 @@ const handler = async (req: Request): Promise<Response> => {
     const { message, conversationHistory = [], productContext = [] }: ChatRequest = await req.json();
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
 
-    if (!geminiApiKey) {
-      throw new Error('Gemini API key not configured');
-    }
+    if (!geminiApiKey) throw new Error('Gemini API key not set');
 
-    // Build context for the AI about available products
-    const productInfo = productContext.length > 0 
-      ? `\n\nAvailable products: ${JSON.stringify(productContext.slice(0, 10))}`
-      : '';
+    const ragContext = await getProductContext(message);
 
-    const systemPrompt = `You are a helpful shopping assistant for VoiceShop. You can help users find products, answer questions about items, and provide recommendations. Be conversational and helpful.${productInfo}`;
+    const systemPrompt = `Eres un asistente de compras. Usa SOLO esta información de productos para responder la pregunta del usuario. Actúa como un asistente de compras directo y eficiente. Sé claro y breve, no repitas, evita detalles innecesarios, y no tardes más de 30 segundos en tu respuesta. Si no tienes suficiente información, dilo claramente.\n\n${ragContext}\n\nUsuario: ${message}`;
 
-    // Prepare messages for Gemini
     const messages = [
       { role: 'user', parts: [{ text: systemPrompt }] },
       ...conversationHistory.map(msg => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
+        parts: [{ text: msg.content }],
       })),
-      { role: 'user', parts: [{ text: message }] }
+      { role: 'user', parts: [{ text: message }] },
     ];
-
-    console.log('Sending request to Gemini API:', { messageCount: messages.length });
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: messages.slice(1), // Remove system prompt from contents
+        contents: messages.slice(1),
         generationConfig: {
           temperature: 0.7,
           topK: 40,
@@ -69,22 +142,20 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
+      console.error('Gemini error:', errorText);
       throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('Gemini API response received');
-
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I couldn\'t generate a response.';
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Lo siento, no pude generar una respuesta.';
 
     return new Response(JSON.stringify({ response: aiResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error('Error in gemini-chat function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (err) {
+    console.error('Handler error:', err);
+    return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
